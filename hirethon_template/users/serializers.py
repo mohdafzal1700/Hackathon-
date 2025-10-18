@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.exceptions import AuthenticationFailed
+
+from django.conf import settings
 from .models import User,Organization,Membership,Invite,Namespace,ShortURL
 import re
 import logging 
@@ -31,3 +33,5 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             }
         })
         return data
+    
+    

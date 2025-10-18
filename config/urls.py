@@ -1,3 +1,4 @@
+# project-level urls.py
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -14,36 +15,40 @@ admin.site.site_title = settings.ADMIN_SITE_TITLE
 admin.site.index_title = settings.ADMIN_INDEX_TITLE
 
 urlpatterns = [
+    # Health check & pages
     path("health/", lambda request: HttpResponse(status=200)),
     path("", TemplateView.as_view(template_name="pages/home.html"), name="home"),
     path("about/", TemplateView.as_view(template_name="pages/about.html"), name="about"),
-    # Django Admin, use {% url 'admin:index' %}
-    path(settings.ADMIN_URL, admin.site.urls),
-    # User management
-    path("users/", include("hirethon_template.users.urls", namespace="users")),
-    path("accounts/", include("allauth.urls")),
-    # Your stuff: custom urls includes go here
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-# API URLS
-urlpatterns += [
-    # API base url
-    path("api/", include("config.api_router")),
-    # DRF auth token
+    # Django Admin
+    path(settings.ADMIN_URL, admin.site.urls),
+
+    # Users & Auth
+    # This line of code is including the URLs defined in the `hirethon_template.users.urls` module
+    # under the namespace "users". This allows you to organize and group URLs related to user-related
+    # functionality under the "users" namespace, making it easier to reference and manage these URLs
+    # within your Django project.
+    # path("users/", include("hirethon_template.users.urls", namespace="users")),
+    path("accounts/", include("allauth.urls")),
+    path("rest-auth/", include("dj_rest_auth.urls")),
+    path("rest-auth/registration/", include("dj_rest_auth.registration.urls")),
+
+    # API Token and Schema
     path("auth-token/", obtain_auth_token),
     path("api/schema/", SpectacularAPIView.as_view(), name="api-schema"),
-    path(
-        "api/docs/",
-        SpectacularSwaggerView.as_view(url_name="api-schema"),
-        name="api-docs",
-    ),
-    path('rest-auth/', include('dj_rest_auth.urls')),
-    path('rest-auth/registration/', include('dj_rest_auth.registration.urls')),
+    path("api/docs/", SpectacularSwaggerView.as_view(url_name="api-schema"), name="api-docs"),
+
+    # Application APIs
+    path("api/users/", include("hirethon_template.users.urls")),  # JWT login/register etc.
+    path("api/organizations/", include("organizations.urls")),
+    path("api/shorturls/", include("shorturls.urls")),
 ]
 
+# Static & media files
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Development-only error pages and debug toolbar
 if settings.DEBUG:
-    # This allows the error pages to be debugged during development, just visit
-    # these url in browser to see how these error pages look like.
     urlpatterns += [
         path(
             "400/",
@@ -64,5 +69,4 @@ if settings.DEBUG:
     ]
     if "debug_toolbar" in settings.INSTALLED_APPS:
         import debug_toolbar
-
         urlpatterns = [path("__debug__/", include(debug_toolbar.urls))] + urlpatterns

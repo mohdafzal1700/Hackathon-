@@ -93,6 +93,9 @@ class Namespace(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="created_namespaces")
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        unique_together = ("organization", "name")
+
     def __str__(self):
         return f"{self.organization.name} / {self.name}"
 
