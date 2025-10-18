@@ -1,6 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
+from django.utils import timezone
 from hirethon_template.users.models import Membership,Organization,User,Invite
 from .serializers import OrganizationSerializer,MembershipSerializer,InviteSerializer
 
@@ -195,6 +196,15 @@ class MembershipView(APIView):
 
 class InviteView(APIView):
     permissions_classes =[permissions.IsAuthenticated]
+    
+    def get(self,request):
+        """
+        List all invites for the authenticated user.
+        """
+        user = request.user
+        invites = Invite.objects.filter(email=user.email)
+        serializer = InviteSerializer(invites, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
     def post(self, request,token):
         """
