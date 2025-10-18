@@ -195,9 +195,9 @@ class MembershipView(APIView):
 
 
 class InviteView(APIView):
-    permissions_classes =[permissions.IsAuthenticated]
-    
-    def get(self,request):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
         """
         List all invites for the authenticated user.
         """
@@ -205,27 +205,30 @@ class InviteView(APIView):
         invites = Invite.objects.filter(email=user.email)
         serializer = InviteSerializer(invites, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
-    def post(self, request,token):
+
+    def post(self, request, token):
         """
-        Accept an invitation to join an organization.
+        Accept or reject an invitation using 'action' field.
+        Example payload: { "action": "accept" } or { "action": "reject" }
         """
         user = request.user
         try:
-            invite = Invite.objects.get(token=token, status="Pending")
+            invite = Invite.objects.get(token=token)
         except Invite.DoesNotExist:
-            return Response({"error": "Invalid or expired invite token."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Invalid invite token."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Check if user is already a member
-        if Membership.objects.filter(user=user, organization=invite.organization).exists():
-            return Response({"error": "You are already a member of this organization."}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = InviteSerializer(
+            invite,
+            data=request.data,
+            partial=True,
+            context={"invite": invite, "user": user}
+        )
 
-        # Create membership
-        Membership.objects.create(user=user, organization=invite.organization, role=invite.role)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"success": f"Invite {serializer.validated_data['action']}ed successfully."},
+                status=status.HTTP_200_OK
+            )
 
-        # Update invite status
-        invite.status = "Accepted"
-        invite.accepted_at = timezone.now()
-        invite.save()
-
-        return Response({"success": f"You have joined the organization '{invite.organization.name}' as {invite.role}."}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

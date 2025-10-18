@@ -363,6 +363,8 @@ CLOUDFRONT_DOMAIN = env("CLOUDFRONT_DOMAIN", default="")
 
 # Update CORS settings
 CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "https://staging.app.hirethon_template.in",
     "https://app.hirethon_template.in",
     "https://*.hirethon_template.in",

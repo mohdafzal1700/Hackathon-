@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
+
 class SignupView(generics.CreateAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
@@ -29,9 +30,17 @@ class SignupView(generics.CreateAPIView):
                 "user": UserSerializer(user).data
             }, status=status.HTTP_201_CREATED)
 
-        except IntegrityError:
+        except IntegrityError as e:
+            error_msg = str(e)
+            if 'email' in error_msg.lower():
+                detail = "This email is already registered."
+            elif 'username' in error_msg.lower():
+                detail = "This username is already taken."
+            else:
+                detail = "A user with this information already exists."
+            
             return Response({
-                "error": "A user with this username or email already exists."
+                "error": detail
             }, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:

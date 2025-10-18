@@ -9,18 +9,18 @@ const apiAxios = axios.create({
     baseURL: BASE_URL,
 });
 
-// Token management
-const getAccessToken = () => localStorage.getItem("access_token");
-const getRefreshToken = () => localStorage.getItem("refresh_token");
+// Token management - FIXED: Use consistent key names
+const getAccessToken = () => localStorage.getItem("access");
+const getRefreshToken = () => localStorage.getItem("refresh");
 
 const setTokens = (accessToken, refreshToken) => {
-    localStorage.setItem("access_token", accessToken);
-    if (refreshToken) localStorage.setItem("refresh_token", refreshToken);
+    localStorage.setItem("access", accessToken);
+    if (refreshToken) localStorage.setItem("refresh", refreshToken);
 };
 
 const clearTokens = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("access");
+    localStorage.removeItem("refresh");
     localStorage.removeItem("user");
 };
 
@@ -53,14 +53,48 @@ apiAxios.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// Response interceptor for token refresh
+// Response interceptor for token refresh - FIXED: Handle both 401 and 403
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+    failedQueue.forEach((prom) => {
+        if (error) {
+            prom.reject(error);
+        } else {
+            prom.resolve(token);
+        }
+    });
+    failedQueue = [];
+};
+
 apiAxios.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        // FIXED: Handle both 401 AND 403 errors
+        if (
+            (error.response?.status === 401 || error.response?.status === 403) &&
+            !originalRequest._retry
+        ) {
+            if (isRefreshing) {
+                // Queue this request if already refreshing
+                return new Promise((resolve, reject) => {
+                    failedQueue.push({ resolve, reject });
+                })
+                    .then((token) => {
+                        originalRequest.headers["Authorization"] = `Bearer ${token}`;
+                        return apiAxios(originalRequest);
+                    })
+                    .catch((err) => {
+                        return Promise.reject(err);
+                    });
+            }
+
             originalRequest._retry = true;
+            isRefreshing = true;
+
             try {
                 console.log("🔑 Access token expired, attempting refresh...");
 
@@ -74,13 +108,20 @@ apiAxios.interceptors.response.use(
                     apiAxios.defaults.headers.common["Authorization"] = `Bearer ${newAccess}`;
                     originalRequest.headers["Authorization"] = `Bearer ${newAccess}`;
 
+                    processQueue(null, newAccess);
+                    isRefreshing = false;
+
+                    console.log("✅ Token refreshed successfully");
                     return apiAxios(originalRequest);
                 }
             } catch (refreshError) {
                 console.error("❌ Token refresh failed:", refreshError);
+                processQueue(refreshError, null);
+                isRefreshing = false;
+
                 clearTokens();
                 delete apiAxios.defaults.headers.common["Authorization"];
-                window.location.href = "/login";
+                window.location.href = "/";
                 return Promise.reject(refreshError);
             }
         }
